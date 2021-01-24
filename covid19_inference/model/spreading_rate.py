@@ -20,6 +20,44 @@ log = logging.getLogger(__name__)
 """
 
 
+
+
+
+def lambda_t_gp(
+    mu,
+    pr_len_scale,
+    pr_amp,
+    model=None,
+    name_lambda_t="lambda_t",
+):
+    log.info("Lambda_t with gp")
+    # Get our default mode context
+    model = modelcontext(model)
+    
+    # Priros for the GP hyperparameters
+   
+    #len_scale = pm.Gamma('gp_len_scale', alpha=5, beta=2)
+    #eta = pm.HalfNormal('gp_eta_amp', sigma=0.5)
+    cov_func = pr_amp ** 2 * pm.gp.cov.ExpQuad(1, pr_len_scale)
+    
+    # Create GP
+    gp = pm.gp.Latent(cov_func=cov_func)
+    time_obs = np.arange(model.sim_shape[0])[:,None]
+    log_r_t = gp.prior("log_r_t", X=time_obs)
+    r_t = pm.Deterministic("r_t", tt.exp(log_r_t))
+    
+    # Now translate r_t to lambda_t
+    log_lambda_t = pm.Deterministic("log_lambda_t", tt.log(mu) + log_r_t)
+    lambda_t = pm.Deterministic(name_lambda_t, tt.exp(log_lambda_t))
+    
+    return log_lambda_t
+    
+
+
+
+
+
+
 def lambda_t_with_sigmoids(
     change_points_list,
     pr_median_lambda_0,
